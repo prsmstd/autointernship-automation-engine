@@ -1,0 +1,6 @@
+{{NAME}}
+
+
+
+Has successfully completed the 4-week Internship Program in {{Domain}} at PrismStudio from  {{StartDate}}  to  {{EndDate}}, 
+demonstrating exceptional skill and dedication in real-world projects.
