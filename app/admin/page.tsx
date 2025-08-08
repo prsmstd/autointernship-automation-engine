@@ -1,12 +1,10 @@
-import { ProductionAdminDashboard } from '@/components/admin/ProductionAdminDashboard'
-import { AuthDebug } from '@/components/debug/AuthDebug'
+import { SimpleAdminDashboard } from '@/components/admin/SimpleAdminDashboard'
+import { ProtectedRoute } from '@/components/ProtectedRoute'
 
 export default function AdminPage() {
-  // Use ProductionAdminDashboard - it will handle both real and mock auth
   return (
-    <>
-      <ProductionAdminDashboard />
-      <AuthDebug />
-    </>
+    <ProtectedRoute requireAdmin={true}>
+      <SimpleAdminDashboard />
+    </ProtectedRoute>
   )
 }

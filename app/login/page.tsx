@@ -1,22 +1,50 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { createSupabaseClient } from '@/lib/supabase'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/contexts/AuthContextFinal'
 import { SpinnerIcon, SignInIcon } from '@/components/ui/SafeIcon'
 
 export default function LoginPage() {
-  const [isLogin] = useState(true) // Always true for registered students only
+  const router = useRouter()
+  const { login, signInWithOAuth, user, loading: authLoading } = useAuth()
 
   const [formData, setFormData] = useState({
     email: '',
-    password: '',
-    name: ''
+    password: ''
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
 
-  const supabase = createSupabaseClient()
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (!authLoading && user) {
+      if (user.role === 'A') {
+        router.push('/admin')
+      } else {
+        router.push('/dashboard')
+      }
+    }
+  }, [user, authLoading, router])
+
+  // Handle URL errors
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const urlError = urlParams.get('error')
+    const urlMessage = urlParams.get('message')
+
+    if (urlError) {
+      if (urlError === 'auth_failed') {
+        setError(urlMessage ? decodeURIComponent(urlMessage) : 'Authentication failed. Please try again.')
+      } else if (urlError === 'no_code') {
+        setError('OAuth authentication was cancelled or failed.')
+      }
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname)
+    }
+  }, [])
 
 
 
@@ -29,80 +57,52 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setError('')
+    setSuccess('')
 
     try {
-      // Check for test credentials first
-      const mockStudentEmail = 'student@prismstudio.co.in'
-      const mockStudentPassword = 'student123'
-      const mockAdminEmail = 'admin@prismstudio.co.in'
-      const mockAdminPassword = 'admin123'
+      const result = await login(formData.email, formData.password)
 
-      console.log('Login attempt:', { email: formData.email, password: formData.password })
-
-      if (formData.email === mockStudentEmail && formData.password === mockStudentPassword) {
-        // Student login - set cookie for middleware bypass
-        document.cookie = 'mock-auth=student; path=/; max-age=86400'
-        document.cookie = 'mock-user-role=student; path=/; max-age=86400'
-        document.cookie = 'mock-user-email=student@prismstudio.co.in; path=/; max-age=86400'
-
-        console.log('Student login successful')
-        setLoading(false)
-
-        // Small delay to ensure cookies are set
-        setTimeout(() => {
-          window.location.href = '/dashboard'
-        }, 100)
+      if (result.error) {
+        setError(result.error)
         return
       }
 
-      if (formData.email === mockAdminEmail && formData.password === mockAdminPassword) {
-        // Admin login - set cookie for middleware bypass
-        document.cookie = 'mock-auth=admin; path=/; max-age=86400'
-        document.cookie = 'mock-user-role=admin; path=/; max-age=86400'
-        document.cookie = 'mock-user-email=admin@prismstudio.co.in; path=/; max-age=86400'
+      if (result.user) {
+        setSuccess(`${result.user.role === 'A' ? 'Admin' : 'Student'} login successful! Redirecting...`)
 
-        console.log('Admin login successful')
-        setLoading(false)
-
-        // Small delay to ensure cookies are set
+        // Redirect based on role
         setTimeout(() => {
-          window.location.href = '/admin'
-        }, 100)
-        return
-      }
-
-      // If no test credentials match, show error
-      if (formData.email === mockStudentEmail || formData.email === mockAdminEmail) {
-        throw new Error('Invalid password')
-      } else {
-        throw new Error('User not found. Only registered students can login.')
-      }
-
-      // Real login
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: formData.email,
-        password: formData.password
-      })
-
-      if (error) throw error
-
-      // Check user role and redirect
-      if (data.user) {
-        const { data: userProfile } = await supabase
-          .from('users')
-          .select('role')
-          .eq('id', data.user.id)
-          .single()
-
-        if (userProfile?.role === 'admin') {
-          window.location.href = '/admin'
-        } else {
-          window.location.href = '/dashboard'
-        }
+          if (result.user!.role === 'A') {
+            router.push('/admin')
+          } else {
+            router.push('/dashboard')
+          }
+        }, 1000)
       }
     } catch (error: any) {
-      setError(error.message)
+      setError(error.message || 'Login failed')
     } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleGoogleSignIn = async () => {
+    setLoading(true)
+    setError('')
+    setSuccess('Redirecting to Google...')
+
+    try {
+      const result = await signInWithOAuth('google')
+
+      if (result.error) {
+        setSuccess('')
+        setError(result.error)
+        setLoading(false)
+      }
+      // If successful, user will be redirected to Google OAuth flow
+    } catch (error: any) {
+      setSuccess('')
+      setError(error.message || 'Failed to initiate Google Sign-In')
       setLoading(false)
     }
   }
@@ -156,6 +156,12 @@ export default function LoginPage() {
                 </div>
               )}
 
+              {success && (
+                <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <p className="text-green-700 text-sm">{success}</p>
+                </div>
+              )}
+
               <form onSubmit={handleSubmit} className="space-y-4">
 
                 <div>
@@ -174,7 +180,7 @@ export default function LoginPage() {
                 <div>
                   <div className="flex justify-between items-center mb-2">
                     <label className="block text-sm font-semibold text-gray-700">Password</label>
-                    {isLogin && (
+                    {true && (
                       <button
                         type="button"
                         onClick={async () => {
@@ -182,18 +188,7 @@ export default function LoginPage() {
                             setError('Please enter your email address first')
                             return
                           }
-                          try {
-                            setLoading(true)
-                            const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
-                              redirectTo: `${window.location.origin}/auth/reset-password`
-                            })
-                            if (error) throw error
-                            alert('Password reset link sent to your email!')
-                          } catch (error: any) {
-                            setError(error.message)
-                          } finally {
-                            setLoading(false)
-                          }
+                          alert('Password reset not available in demo mode. Use test credentials: student@prismstudio.co.in / student123')
                         }}
                         className="text-xs text-red-600 hover:text-red-800 font-medium underline-offset-4 hover:underline"
                       >
@@ -244,23 +239,9 @@ export default function LoginPage() {
 
                 <button
                   type="button"
-                  onClick={async () => {
-                    try {
-                      setLoading(true)
-                      const { error } = await supabase.auth.signInWithOAuth({
-                        provider: 'google',
-                        options: {
-                          redirectTo: `${window.location.origin}/auth/callback`
-                        }
-                      })
-                      if (error) throw error
-                    } catch (error: any) {
-                      setError(error.message)
-                      setLoading(false)
-                    }
-                  }}
+                  onClick={handleGoogleSignIn}
                   disabled={loading}
-                  className="mt-4 w-full flex justify-center items-center px-4 py-3 border border-gray-300 rounded-xl shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-all duration-300"
+                  className="mt-4 w-full flex justify-center items-center px-4 py-3 border border-gray-300 rounded-xl shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
                     <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -276,7 +257,7 @@ export default function LoginPage() {
               </div>
 
               {/* Forgot Password */}
-              {isLogin && (
+              {true && (
                 <div className="mt-4 text-center">
                   <button
                     type="button"
@@ -285,18 +266,7 @@ export default function LoginPage() {
                         setError('Please enter your email address first')
                         return
                       }
-                      try {
-                        setLoading(true)
-                        const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
-                          redirectTo: `${window.location.origin}/auth/reset-password`
-                        })
-                        if (error) throw error
-                        alert('Password reset link sent to your email!')
-                      } catch (error: any) {
-                        setError(error.message)
-                      } finally {
-                        setLoading(false)
-                      }
+                      alert('Password reset not available in demo mode. Use test credentials: student@prismstudio.co.in / student123')
                     }}
                     className="text-red-600 hover:text-red-800 font-medium text-sm underline-offset-4 hover:underline"
                   >
@@ -306,17 +276,21 @@ export default function LoginPage() {
               )}
 
               {/* Registration Notice */}
-              {isLogin && (
-                <div className="mt-6 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-blue-800 text-xs text-center">
-                    <strong>For registered students only.</strong> If you haven't applied for an internship yet, please visit our{' '}
-                    <Link href="/apply" className="text-blue-600 hover:text-blue-800 font-medium underline">
-                      application page
-                    </Link>{' '}
-                    first.
-                  </p>
-                </div>
-              )}
+              <div className="mt-6 text-center">
+                <p className="text-sm text-gray-600">
+                  Don't have an account?{' '}
+                  <Link href="/signup" className="text-blue-600 hover:text-blue-800 font-medium underline-offset-4 hover:underline">
+                    Create one here
+                  </Link>
+                </p>
+              </div>
+
+              {/* Production Notice */}
+              <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-green-800 text-xs text-center">
+                  <strong>Production Ready:</strong> Use your registered account or create a new one
+                </p>
+              </div>
 
 
 

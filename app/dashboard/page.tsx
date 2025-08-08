@@ -1,12 +1,10 @@
 import { ProductionDashboard } from '@/components/dashboard/ProductionDashboardFixed'
-import { AuthDebug } from '@/components/debug/AuthDebug'
+import { ProtectedRoute } from '@/components/ProtectedRoute'
 
 export default function DashboardPage() {
-  // Use the fixed ProductionDashboard that handles both real and mock auth gracefully
   return (
-    <>
+    <ProtectedRoute>
       <ProductionDashboard />
-      <AuthDebug />
-    </>
+    </ProtectedRoute>
   )
 }

@@ -61,8 +61,8 @@ export default function VerifyPage() {
   }, [])
 
   const validateCertificateId = (id: string): boolean => {
-    // PS2506DS148 format validation
-    const pattern = /^PS\d{4}[A-Z]{2,4}\d{3}$/
+    // PS2506DS148 format validation (PS + YYMM + 2-letter domain + 3-digit number)
+    const pattern = /^PS\d{4}[A-Z]{2}\d{3}$/
     return pattern.test(id.trim().toUpperCase())
   }
 
@@ -144,8 +144,8 @@ export default function VerifyPage() {
         verificationHash: 'a1b2c3d4e5f67890',
         verifiedAt: new Date().toISOString()
       },
-      'PS2506WEB101': {
-        id: 'PS2506WEB101',
+      'PS2506WD001': {
+        id: 'PS2506WD001',
         studentName: 'John Developer',
         studentEmail: 'john@example.com',
         track: 'Web Development',
@@ -164,8 +164,8 @@ export default function VerifyPage() {
         verificationHash: 'b2c3d4e5f6789012',
         verifiedAt: new Date().toISOString()
       },
-      'PS2506UI102': {
-        id: 'PS2506UI102',
+      'PS2506UD002': {
+        id: 'PS2506UD002',
         studentName: 'Sarah Designer',
         studentEmail: 'sarah@example.com',
         track: 'UI/UX Design',
@@ -599,8 +599,8 @@ export default function VerifyPage() {
                     <div className="grid sm:grid-cols-3 gap-4 max-w-4xl mx-auto">
                       {[
                         { id: 'PS2506DS148', name: 'Alex Data Scientist', domain: 'Data Science', status: 'Best Performer' },
-                        { id: 'PS2506WEB101', name: 'John Developer', domain: 'Web Development', status: 'Certified' },
-                        { id: 'PS2506UI102', name: 'Sarah Designer', domain: 'UI/UX Design', status: 'Best Performer' }
+                        { id: 'PS2506WD001', name: 'John Developer', domain: 'Web Development', status: 'Certified' },
+                        { id: 'PS2506UD002', name: 'Sarah Designer', domain: 'UI/UX Design', status: 'Best Performer' }
                       ].map((cert) => (
                         <button
                           key={cert.id}

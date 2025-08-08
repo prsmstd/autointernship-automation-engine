@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createSupabaseClient } from '@/lib/supabase'
-import { useAuth } from '@/app/providers'
+import { useAuth } from '@/contexts/AuthContextFinal'
 import { DomainSelector } from './DomainSelector'
 import { TaskDetailModal } from './TaskDetailModal'
 
@@ -38,14 +38,14 @@ export function ProductionDashboard() {
   const [showTaskModal, setShowTaskModal] = useState(false)
 
   const supabase = createSupabaseClient()
-  const { user: authUser, userProfile: authProfile } = useAuth()
+  const { user: authUser } = useAuth()
 
   useEffect(() => {
     // Only load data when auth is not loading
-    if (authUser !== undefined || authProfile !== undefined) {
+    if (authUser !== undefined) {
       loadDashboardData()
     }
-  }, [authUser, authProfile])
+  }, [authUser])
 
   const loadDashboardData = async () => {
     try {
@@ -55,46 +55,12 @@ export function ProductionDashboard() {
       // Determine current user from auth context
       let currentUser = null
 
-      if (authProfile) {
-        // Mock or profile-based authentication
-        currentUser = authProfile
-        console.log('Using auth profile:', currentUser)
-      } else if (authUser) {
-        // Real Supabase authentication - create/get profile
-        try {
-          const { data: existingProfile } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', authUser.id)
-            .single()
-
-          if (existingProfile) {
-            currentUser = existingProfile
-          } else {
-            // Create new user profile
-            const { data: newProfile } = await supabase
-              .from('users')
-              .insert({
-                id: authUser.id,
-                name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Student',
-                email: authUser.email || '',
-                role: 'student'
-              })
-              .select()
-              .single()
-            
-            currentUser = newProfile
-          }
-        } catch (dbError) {
-          console.warn('Database not available, using fallback profile')
-          currentUser = {
-            id: authUser.id,
-            name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Student',
-            email: authUser.email || '',
-            domain: 'web_development',
-            role: 'student',
-            hasSelectedDomain: true
-          }
+      if (authUser) {
+        // Use the user from our simple auth system
+        currentUser = {
+          ...authUser,
+          domain: 'web_development', // Default domain for demo
+          hasSelectedDomain: true
         }
       }
 

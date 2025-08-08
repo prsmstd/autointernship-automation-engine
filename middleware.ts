@@ -1,6 +1,12 @@
 // Enterprise-level security middleware for Next.js
 import { NextRequest, NextResponse } from 'next/server'
 
+// Helper function to determine if we should use mock auth
+function shouldUseMockAuth(): boolean {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  return !supabaseUrl || supabaseUrl.includes('mock') || supabaseUrl.includes('localhost') || process.env.NODE_ENV === 'development'
+}
+
 // Mock security utilities for development
 const SECURITY_HEADERS = {
   'X-Frame-Options': 'DENY',
@@ -194,46 +200,47 @@ async function handleAPIRoute(request: NextRequest, response: NextResponse, path
 
 // Handle protected route authentication
 async function handleProtectedRoute(request: NextRequest, response: NextResponse, pathname: string) {
-  // Check for authentication token in cookies
-  const accessToken = request.cookies.get('sb-access-token')?.value
+  // Skip auth checks in mock mode (development/testing)
+  if (shouldUseMockAuth()) {
+    console.log('Mock mode: Skipping server-side auth check for protected route:', { pathname })
+    return response
+  }
   
-  // Allow bypass for development/testing with mock credentials
-  const mockBypass = request.cookies.get('mock-auth')?.value
+  // Check for session token in cookies
+  const sessionToken = request.cookies.get('session_token')?.value
+  const authToken = request.cookies.get('auth-token')?.value // Fallback for compatibility
   
-  console.log('Protected route check:', { pathname, accessToken: !!accessToken, mockBypass })
-  
-  if (!accessToken && !mockBypass) {
-    await AuditLogger.log()
-
-    // Redirect to login with return URL
+  if (!sessionToken && !authToken) {
+    console.log('No session token, redirecting to login:', { pathname })
     const loginUrl = new URL('/login', request.url)
-    loginUrl.searchParams.set('returnUrl', pathname)
     return NextResponse.redirect(loginUrl)
   }
-
+  
+  console.log('Session token found, allowing access:', { pathname })
   return response
 }
 
 // Handle admin route authorization
 async function handleAdminRoute(request: NextRequest, response: NextResponse, pathname: string) {
-  const accessToken = request.cookies.get('sb-access-token')?.value
-  const mockBypass = request.cookies.get('mock-auth')?.value
-  const mockRole = request.cookies.get('mock-user-role')?.value
+  // Skip auth checks in mock mode (development/testing)
+  if (shouldUseMockAuth()) {
+    console.log('Mock mode: Skipping server-side auth check for admin route:', { pathname })
+    return response
+  }
   
-  console.log('Admin route check:', { accessToken: !!accessToken, mockBypass, mockRole })
+  // Check for session token in cookies
+  const sessionToken = request.cookies.get('session_token')?.value
+  const authToken = request.cookies.get('auth-token')?.value // Fallback
   
-  if (!accessToken && (!mockBypass || mockRole !== 'admin')) {
-    await AuditLogger.log()
-
+  if (!sessionToken && !authToken) {
+    console.log('No session token for admin route, redirecting to login:', { pathname })
     const loginUrl = new URL('/login', request.url)
     return NextResponse.redirect(loginUrl)
   }
-
-  // Additional admin verification would be done in the actual route handler
-  // This middleware just ensures there's some form of authentication
-
-  await AuditLogger.log()
-
+  
+  // In production, we would decode the JWT to check role
+  // For now, we'll let the client-side route guard handle role checking
+  console.log('Session found for admin route, allowing access:', { pathname })
   return response
 }
 

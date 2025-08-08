@@ -6,6 +6,8 @@ export async function GET(request: NextRequest) {
   const code = requestUrl.searchParams.get('code')
   const origin = requestUrl.origin
 
+  console.log('Auth callback received:', { code: !!code, origin })
+
   if (code) {
     const supabase = createSupabaseClient()
     
@@ -14,11 +16,13 @@ export async function GET(request: NextRequest) {
       
       if (error) {
         console.error('Auth callback error:', error)
-        return NextResponse.redirect(`${origin}/login?error=auth_failed`)
+        return NextResponse.redirect(`${origin}/login?error=auth_failed&message=${encodeURIComponent(error.message)}`)
       }
 
       if (data.user) {
-        // Check if user profile exists, create if not
+        console.log('User authenticated via OAuth:', data.user.email)
+        
+        // Try to create/update user profile
         try {
           const { data: existingProfile } = await supabase
             .from('users')
@@ -27,7 +31,7 @@ export async function GET(request: NextRequest) {
             .single()
 
           if (!existingProfile) {
-            // Create new user profile
+            console.log('Creating new user profile')
             await supabase
               .from('users')
               .insert({
@@ -38,19 +42,19 @@ export async function GET(request: NextRequest) {
               })
           }
 
-          // Redirect to dashboard
+          console.log('Redirecting to dashboard')
           return NextResponse.redirect(`${origin}/dashboard`)
         } catch (dbError) {
-          console.warn('Database not available, proceeding with auth only')
+          console.warn('Database not available, proceeding with auth only:', dbError)
           return NextResponse.redirect(`${origin}/dashboard`)
         }
       }
     } catch (error) {
       console.error('OAuth exchange error:', error)
-      return NextResponse.redirect(`${origin}/login?error=auth_failed`)
+      return NextResponse.redirect(`${origin}/login?error=auth_failed&message=${encodeURIComponent('OAuth exchange failed')}`)
     }
   }
 
-  // Fallback redirect
-  return NextResponse.redirect(`${origin}/login`)
+  console.log('No code provided, redirecting to login')
+  return NextResponse.redirect(`${origin}/login?error=no_code`)
 }
